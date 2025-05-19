@@ -9,6 +9,8 @@ BACKEND
 │   │   main.py # 서버 실행 파일
 │   │   models.py # ORM 모델 관리 파일
 │   │   user_schemas.py # 유저 관련 pydantic 모델 관리 파일
+|   |   food_schemas.py # 음식 관련 pydantic 모델 관리 파일
+|   |   gemini_client.py # gemini 호출 파일
 |   |   dependencies.py # DB 의존성 주입 파일
 ```
 ---
