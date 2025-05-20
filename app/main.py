@@ -149,17 +149,21 @@ def get_inventory(
         )
     return result
 
-
-## 식사 저장
+##식사저장
 @app.post("/meals")
 def add_meal(
     meal: food_schemas.MealCreate,
     db: db_dependency,
     current_user: models.User = Depends(auth.get_current_user),
 ):
+    # 🔥 이 부분 추가!
+    food = db.query(models.Food).filter(models.Food.name == meal.food_name).first()
+    if not food:
+        raise HTTPException(status_code=404, detail="해당 음식이 존재하지 않습니다.")
+
     new_meal = models.Meal(
         user_id=current_user.user_id,
-        food_id=meal.food_id,
+        food_id=food.food_id,  # ✅ 이제 오류 없음
         quantity=meal.quantity,
         datetime=datetime.now(timezone.utc),
     )
@@ -167,6 +171,27 @@ def add_meal(
     db.commit()
     return {"message": "식사 기록이 저장되었습니다"}
 
+## 식사기록 보기기
+@app.get("/meals")
+def get_meals(
+    db: db_dependency,
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    meals = (
+        db.query(models.Meal)
+        .filter(models.Meal.user_id == current_user.user_id)
+        .order_by(models.Meal.datetime.desc())
+        .all()
+    )
+    result = []
+    for meal in meals:
+        food = db.query(models.Food).filter_by(food_id=meal.food_id).first()
+        result.append({
+            "datetime": meal.datetime.isoformat(),
+            "food_name": food.name if food else "Unknown",
+            "quantity": meal.quantity
+        })
+    return result
 
 ## ai 식단 추천
 @app.get("/ai-diet")
@@ -211,3 +236,11 @@ def get_ai_diet(
 
     ai_response = ask_gemini(prompt)
     return {"recommendation": ai_response.strip()}
+## 음식 검색 API
+@app.get("/foods/search")
+def search_foods(
+    name: str,
+    db: db_dependency,
+):
+    results = db.query(models.Food).filter(models.Food.name.ilike(f"%{name}%")).all()
+    return [{"food_id": food.food_id, "name": food.name} for food in results]

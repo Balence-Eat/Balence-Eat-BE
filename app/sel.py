@@ -4,23 +4,23 @@ import matplotlib.pyplot as plt
 import matplotlib
 import datetime
 import os
+import requests
 
 # 한글 폰트 설정
 matplotlib.rc('font', family='Malgun Gothic')
 matplotlib.rcParams['axes.unicode_minus'] = False
 
-# 저장 경로
-SAVE_PATH = "saved_meals.csv"
-MEAL_LOG_PATH = "meals_log.csv"
-
 @st.cache_data
 def load_data():
-    return pd.read_csv("C:/Users/jyt63/Downloads/cleaned_grouped_foodDB.csv")
+    return pd.read_csv("C:/Users/tiran/Downloads/cleaned_grouped_foodDB.csv")
 
 df = load_data()
 df["대분류"] = df["대표명"].str.split("_").str[0]
 
 st.title("Balance Eat")
+
+# ✅ JWT 토큰 입력
+token = st.text_input("✅ JWT 토큰을 입력해주세요", type="password")
 
 # 검색 기능
 search_term = st.text_input("음식 이름을 입력해주세요").lower().strip()
@@ -41,7 +41,6 @@ if food_options:
     selected_food = st.selectbox("음식 선택", food_options)
     row = category_filtered[category_filtered["대표명"] == selected_food].iloc[0]
 
-    # 영양 정보 표시
     st.subheader(f"{selected_food}의 영양 성분")
     nutrient_data = {
         "열량 (kcal)": row["열량"],
@@ -51,7 +50,6 @@ if food_options:
     }
     st.write(pd.DataFrame(nutrient_data.items(), columns=["항목", "값"]))
 
-    # 저장 버튼
     if st.button("선택한 음식 저장"):
         if "saved" not in st.session_state:
             st.session_state["saved"] = []
@@ -67,24 +65,15 @@ if food_options:
         st.session_state["saved"].append(saved_row)
         st.success("저장 완료")
 
-        # CSV 저장
-        saved_df = pd.DataFrame(st.session_state["saved"])
-        if os.path.exists(SAVE_PATH):
-            existing = pd.read_csv(SAVE_PATH)
-            saved_df = pd.concat([existing, saved_df], ignore_index=True).drop_duplicates()
-        saved_df.to_csv(SAVE_PATH, index=False)
-
 else:
     st.warning("⚠ 해당 조건에 맞는 음식이 없습니다.")
 
-# 저장된 식단 표시 및 삭제 기능
 if "saved" in st.session_state and st.session_state["saved"]:
     st.markdown("---")
     st.subheader("저장된 식단")
 
     saved_df = pd.DataFrame(st.session_state["saved"])
 
-    # 삭제 버튼 눌렀을 때 인덱스 기록
     for idx, row in saved_df.iterrows():
         col1, col2 = st.columns([5, 1])
         with col1:
@@ -93,18 +82,15 @@ if "saved" in st.session_state and st.session_state["saved"]:
             if st.button("목록에서 삭제", key=f"delete_{idx}"):
                 st.session_state["delete_index"] = idx
 
-    # 삭제 처리
     if "delete_index" in st.session_state:
         idx_to_delete = st.session_state.pop("delete_index")
         if idx_to_delete < len(st.session_state["saved"]):
             st.session_state["saved"].pop(idx_to_delete)
 
-    # 총 영양 성분 합계
     st.subheader("총 영양 성분")
     total_nutrients = saved_df[["열량", "탄수화물", "단백질", "지방"]].sum()
     st.write(total_nutrients)
 
-    # 그래프로 성분 시각화
     st.subheader("총 섭취 탄/단/지 그래프")
     labels = ["탄수화물", "단백질", "지방"]
     values = [total_nutrients["탄수화물"], total_nutrients["단백질"], total_nutrients["지방"]]
@@ -114,20 +100,36 @@ if "saved" in st.session_state and st.session_state["saved"]:
     ax.set_ylabel("g")
     st.pyplot(fig)
 
-    # 한끼 저장 기능
     st.markdown("---")
-    st.subheader("한끼로 저장")
+    st.subheader("한끼로 FastAPI에 저장")
+
     if st.button("한끼 저장하기"):
-        meal_df = pd.DataFrame(st.session_state["saved"])
-        meal_df["저장일시"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        meal_df["한끼ID"] = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        if not token:
+            st.warning("⚠️ JWT 토큰을 입력해야 합니다.")
+        else:
+            success = True
+            for row in st.session_state["saved"]:
+                try:
+                    # ✅ 수정: food_id 제거 → food_name만 전달
+                    response = requests.post(
+                        "http://localhost:8000/meals",
+                        json={"food_name": row["대표명"], "quantity": 1},
+                        headers={"Authorization": f"Bearer {token}"}
+                    )   
 
-        if os.path.exists(MEAL_LOG_PATH):
-            existing = pd.read_csv(MEAL_LOG_PATH)
-            meal_df = pd.concat([existing, meal_df], ignore_index=True)
+                    if response.status_code != 200:
+                        success = False
+                        st.error(f"❌ 실패: {response.status_code} - {response.text}")
+                except Exception as e:
+                    success = False
+                    st.error(f"❌ 예외 발생: {e}")
+            if success:
+                st.success("✅ 한끼 저장 완료 (FastAPI)")
+                st.session_state["saved"] = []
 
-        meal_df.to_csv(MEAL_LOG_PATH, index=False)
-        st.success("한끼 저장 완료!")
-
-        # 저장 목록 초기화
-        st.session_state["saved"] = []
+if st.button("서버에서 식사 기록 불러오기"):
+    response = requests.get(
+        "http://localhost:8000/meals",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    st.write(response.json())
