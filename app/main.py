@@ -186,10 +186,16 @@ def get_meals(
     result = []
     for meal in meals:
         food = db.query(models.Food).filter_by(food_id=meal.food_id).first()
+        if not food:
+            continue
         result.append({
             "datetime": meal.datetime.isoformat(),
-            "food_name": food.name if food else "Unknown",
-            "quantity": meal.quantity
+            "food_name": food.name,
+            "quantity": meal.quantity,
+            "calories": (food.calories_per_unit or 0) * meal.quantity,
+            "protein": (food.protein_per_unit or 0) * meal.quantity,
+            "carbs": (food.carbs_per_unit or 0) * meal.quantity,
+            "fat": (food.fat_per_unit or 0) * meal.quantity,
         })
     return result
 

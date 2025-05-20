@@ -132,4 +132,28 @@ if st.button("서버에서 식사 기록 불러오기"):
         "http://localhost:8000/meals",
         headers={"Authorization": f"Bearer {token}"}
     )
-    st.write(response.json())
+    if response.status_code == 200:
+        data = response.json()
+        total = {"calories": 0, "protein": 0, "carbs": 0, "fat": 0}
+        for meal in data:
+            st.markdown(f"""
+            - 🍽 **{meal['food_name']}** x {meal['quantity']}  
+              - 열량: {meal['calories']} kcal  
+              - 탄수화물: {meal['carbs']}g / 단백질: {meal['protein']}g / 지방: {meal['fat']}g  
+              - 시간: `{meal['datetime']}`
+            """)
+            total["calories"] += meal["calories"]
+            total["protein"] += meal["protein"]
+            total["carbs"] += meal["carbs"]
+            total["fat"] += meal["fat"]
+
+        st.markdown("---")
+        st.subheader("🥗 전체 총합")
+        st.write(f"""
+        - 총 열량: {total['calories']} kcal  
+        - 탄수화물: {total['carbs']}g  
+        - 단백질: {total['protein']}g  
+        - 지방: {total['fat']}g
+        """)
+    else:
+        st.error("식사 기록을 불러오는 데 실패했습니다.")
