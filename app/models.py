@@ -18,6 +18,9 @@ class Meal(Base):
     )
     quantity = Column(Integer, default=1, nullable=False)
     datetime = Column(DateTime, default=datetime.now(timezone.utc))
+    
+    # 식사 아침,점심,저녁,종류 추가
+    meal_type = Column(Enum("아침", "점심", "저녁", name="meal_type_enum"), nullable=False)
 
     user = relationship("User", back_populates="meals")
     food = relationship("Food", back_populates="meals")

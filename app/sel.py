@@ -3,7 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
 import datetime
-import os
 import requests
 
 # 한글 폰트 설정
@@ -22,15 +21,11 @@ st.title("Balance Eat")
 # ✅ JWT 토큰 입력
 token = st.text_input("✅ JWT 토큰을 입력해주세요", type="password")
 
-# 검색 기능
+# 음식 검색
 search_term = st.text_input("음식 이름을 입력해주세요").lower().strip()
+search_filtered = df[df["대표명"].str.contains(search_term, case=False)] if search_term else df
 
-if search_term:
-    mask = df["대표명"].str.contains(search_term, case=False) | df["대분류"].str.contains(search_term, case=False)
-    search_filtered = df[mask]
-else:
-    search_filtered = df
-
+# 대분류 선택
 available_categories = sorted(search_filtered["대분류"].unique())
 selected_category = st.selectbox("대분류 선택", available_categories)
 
@@ -54,20 +49,20 @@ if food_options:
         if "saved" not in st.session_state:
             st.session_state["saved"] = []
 
-        saved_row = {
+        st.session_state["saved"].append({
             "대표명": row["대표명"],
             "열량": row["열량"],
             "탄수화물": row["탄수화물"],
             "단백질": row["단백질"],
             "지방": row["지방"],
             "저장시간": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        st.session_state["saved"].append(saved_row)
-        st.success("저장 완료")
+        })
+        st.success("✅ 저장 완료")
 
 else:
     st.warning("⚠ 해당 조건에 맞는 음식이 없습니다.")
 
+# 저장된 음식 목록 표시
 if "saved" in st.session_state and st.session_state["saved"]:
     st.markdown("---")
     st.subheader("저장된 식단")
@@ -79,81 +74,75 @@ if "saved" in st.session_state and st.session_state["saved"]:
         with col1:
             st.write(f"{row['대표명']} | 열량: {row['열량']} kcal | 탄: {row['탄수화물']}g, 단: {row['단백질']}g, 지: {row['지방']}g")
         with col2:
-            if st.button("목록에서 삭제", key=f"delete_{idx}"):
+            if st.button("❌ 삭제", key=f"delete_{idx}"):
                 st.session_state["delete_index"] = idx
 
     if "delete_index" in st.session_state:
-        idx_to_delete = st.session_state.pop("delete_index")
-        if idx_to_delete < len(st.session_state["saved"]):
-            st.session_state["saved"].pop(idx_to_delete)
+        del_idx = st.session_state.pop("delete_index")
+        st.session_state["saved"].pop(del_idx)
 
     st.subheader("총 영양 성분")
-    total_nutrients = saved_df[["열량", "탄수화물", "단백질", "지방"]].sum()
-    st.write(total_nutrients)
+    total = saved_df[["열량", "탄수화물", "단백질", "지방"]].sum()
+    st.write(total)
 
-    st.subheader("총 섭취 탄/단/지 그래프")
-    labels = ["탄수화물", "단백질", "지방"]
-    values = [total_nutrients["탄수화물"], total_nutrients["단백질"], total_nutrients["지방"]]
-
+    st.subheader("총 섭취 그래프 (탄/단/지)")
     fig, ax = plt.subplots()
-    ax.bar(labels, values, color=["skyblue", "green", "pink"])
-    ax.set_ylabel("g")
+    ax.bar(["탄수화물", "단백질", "지방"], [total["탄수화물"], total["단백질"], total["지방"]])
     st.pyplot(fig)
 
+    # ✅ 식사 타입 선택 추가
     st.markdown("---")
     st.subheader("한끼로 FastAPI에 저장")
+    meal_type = st.selectbox("식사 타입 선택", ["아침", "점심", "저녁"])
 
     if st.button("한끼 저장하기"):
         if not token:
-            st.warning("⚠️ JWT 토큰을 입력해야 합니다.")
+            st.warning("❗ JWT 토큰을 입력해주세요.")
         else:
             success = True
             for row in st.session_state["saved"]:
                 try:
-                    # ✅ 수정: food_id 제거 → food_name만 전달
-                    response = requests.post(
+                    res = requests.post(
                         "http://localhost:8000/meals",
-                        json={"food_name": row["대표명"], "quantity": 1},
-                        headers={"Authorization": f"Bearer {token}"}
-                    )   
-
-                    if response.status_code != 200:
+                        headers={"Authorization": f"Bearer {token}"},
+                        json={
+                            "food_name": row["대표명"],
+                            "quantity": 1,
+                            "meal_type": meal_type
+                        }
+                    )
+                    if res.status_code != 200:
                         success = False
-                        st.error(f"❌ 실패: {response.status_code} - {response.text}")
+                        st.error(f"❌ 실패: {res.status_code} - {res.text}")
                 except Exception as e:
                     success = False
                     st.error(f"❌ 예외 발생: {e}")
+
             if success:
-                st.success("✅ 한끼 저장 완료 (FastAPI)")
+                st.success("✅ FastAPI에 한끼 저장 완료!")
                 st.session_state["saved"] = []
 
+# ✅ 서버에서 식사 기록 조회
 if st.button("서버에서 식사 기록 불러오기"):
-    response = requests.get(
-        "http://localhost:8000/meals",
-        headers={"Authorization": f"Bearer {token}"}
-    )
-    if response.status_code == 200:
-        data = response.json()
+    res = requests.get("http://localhost:8000/meals", headers={"Authorization": f"Bearer {token}"})
+    if res.status_code == 200:
+        meals = res.json()
         total = {"calories": 0, "protein": 0, "carbs": 0, "fat": 0}
-        for meal in data:
+        for meal in meals:
             st.markdown(f"""
-            - 🍽 **{meal['food_name']}** x {meal['quantity']}  
-              - 열량: {meal['calories']} kcal  
-              - 탄수화물: {meal['carbs']}g / 단백질: {meal['protein']}g / 지방: {meal['fat']}g  
-              - 시간: `{meal['datetime']}`
+            - 🍱 {meal['food_name']} x {meal['quantity']}
+              - 열량: {meal['calories']}kcal / 탄: {meal['carbs']}g / 단: {meal['protein']}g / 지: {meal['fat']}g
+              - 🕒 {meal['datetime']} / 🍽 {meal['meal_type']}
             """)
             total["calories"] += meal["calories"]
             total["protein"] += meal["protein"]
             total["carbs"] += meal["carbs"]
             total["fat"] += meal["fat"]
 
-        st.markdown("---")
-        st.subheader("🥗 전체 총합")
-        st.write(f"""
-        - 총 열량: {total['calories']} kcal  
-        - 탄수화물: {total['carbs']}g  
-        - 단백질: {total['protein']}g  
-        - 지방: {total['fat']}g
-        """)
+        st.subheader("전체 총합")
+        st.write(f"🔥 열량: {total['calories']} kcal")
+        st.write(f"🥔 탄수화물: {total['carbs']}g")
+        st.write(f"🍗 단백질: {total['protein']}g")
+        st.write(f"🥑 지방: {total['fat']}g")
     else:
-        st.error("식사 기록을 불러오는 데 실패했습니다.")
+        st.error(f"❌ 식사 기록 불러오기 실패: {res.status_code}")
