@@ -30,3 +30,11 @@ class MealCreate(BaseModel):
     food_name: str
     quantity: int
     meal_type: MealType 
+    
+class MealFoodItem(BaseModel):
+    food_id: int
+    quantity: int
+
+class MealCreate(BaseModel):
+    meal_type: MealType
+    items: list[MealFoodItem]

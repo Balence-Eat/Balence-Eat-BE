@@ -2,10 +2,15 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, date as date_class
+
+# app 내 모듈 import
 from app import models, user_schemas, food_schemas, auth
+from app.models import Meal, Food, MealFood, User
+from app.food_schemas import MealCreate
 from app.database import engine
 from app.dependencies import get_db
 from app.gemini_client import ask_gemini
+
 
 app = FastAPI()
 models.Base.metadata.create_all(engine)
@@ -82,24 +87,35 @@ def get_inventory(db: Session = Depends(get_db), current_user: models.User = Dep
     return result
 
 @app.post("/meals")
-def add_meal(meal: food_schemas.MealCreate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    food = db.query(models.Food).filter(models.Food.name == meal.food_name).first()
-    if not food:
-        raise HTTPException(status_code=404, detail="해당 음식이 존재하지 않습니다.")
-    new_meal = models.Meal(
-        user_id=current_user.user_id,
-        food_id=food.food_id,
-        quantity=meal.quantity,
-        datetime=datetime.now(timezone.utc),
-        meal_type=meal.meal_type
-    )
+def add_meal(meal: MealCreate, db: Session = Depends(get_db), current_user: User = Depends(auth.get_current_user)):
+    new_meal = Meal(user_id=current_user.user_id, meal_type=meal.meal_type, datetime=datetime.now(timezone.utc))
     db.add(new_meal)
+    db.flush()
+
+    for item in meal.items:
+        food = db.query(Food).filter(Food.food_id == item.food_id).first()
+        if not food:
+            raise HTTPException(status_code=404, detail="해당 음식이 존재하지 않습니다.")
+
+        meal_food = MealFood(
+            meal_id=new_meal.meal_id,
+            food_id=food.food_id,
+            quantity=item.quantity,
+            calories=(food.calories_per_unit or 0) * item.quantity,
+            protein=(food.protein_per_unit or 0) * item.quantity,
+            carbs=(food.carbs_per_unit or 0) * item.quantity,
+            fat=(food.fat_per_unit or 0) * item.quantity
+        )
+        db.add(meal_food)
+
     db.commit()
-    return {"message": "식사 기록이 저장되었습니다"}
+    return {"message": "한 끼 저장 완료"}
+
 
 @app.get("/meals")
 def get_meals(date: str = None, meal_type: str = None, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     query = db.query(models.Meal).filter(models.Meal.user_id == current_user.user_id)
+
     if date:
         try:
             date_obj = datetime.strptime(date, "%Y-%m-%d").date()
@@ -108,23 +124,38 @@ def get_meals(date: str = None, meal_type: str = None, db: Session = Depends(get
             raise HTTPException(status_code=400, detail="날짜 형식은 YYYY-MM-DD여야 합니다.")
     if meal_type:
         query = query.filter(models.Meal.meal_type == meal_type)
+
     meals = query.order_by(models.Meal.datetime.desc()).all()
     result = []
+
     for meal in meals:
-        food = db.query(models.Food).filter_by(food_id=meal.food_id).first()
-        if not food:
-            continue
+        total = {"calories": 0, "protein": 0, "carbs": 0, "fat": 0}
+        foods = []
+
+        for mf in meal.meal_foods:
+            foods.append({
+                "food_name": mf.food.name,
+                "quantity": mf.quantity,
+                "calories": mf.calories,
+                "protein": mf.protein,
+                "carbs": mf.carbs,
+                "fat": mf.fat
+            })
+            total["calories"] += mf.calories or 0
+            total["protein"] += mf.protein or 0
+            total["carbs"] += mf.carbs or 0
+            total["fat"] += mf.fat or 0
+
         result.append({
+            "meal_id": meal.meal_id,
             "datetime": meal.datetime.isoformat(),
             "meal_type": meal.meal_type,
-            "food_name": food.name,
-            "quantity": meal.quantity,
-            "calories": (food.calories_per_unit or 0) * meal.quantity,
-            "protein": (food.protein_per_unit or 0) * meal.quantity,
-            "carbs": (food.carbs_per_unit or 0) * meal.quantity,
-            "fat": (food.fat_per_unit or 0) * meal.quantity
+            "total": total,
+            "foods": foods
         })
+
     return result
+
 
 @app.get("/ai-diet")
 def get_ai_diet(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):

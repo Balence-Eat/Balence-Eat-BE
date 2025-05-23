@@ -6,24 +6,32 @@ from datetime import datetime, timezone
 """DB 모델"""
 
 
-## Meal 테이블
 class Meal(Base):
     __tablename__ = "meals"
     meal_id = Column(Integer, primary_key=True)
-    user_id = Column(
-        Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
-    )
-    food_id = Column(
-        Integer, ForeignKey("foods.food_id", ondelete="CASCADE"), nullable=False
-    )
-    quantity = Column(Integer, default=1, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"))
     datetime = Column(DateTime, default=datetime.now(timezone.utc))
-    
-    # 식사 아침,점심,저녁,종류 추가
     meal_type = Column(Enum("아침", "점심", "저녁", name="meal_type_enum"), nullable=False)
 
     user = relationship("User", back_populates="meals")
-    food = relationship("Food", back_populates="meals")
+    meal_foods = relationship("MealFood", back_populates="meal", cascade="all, delete-orphan")
+
+
+class MealFood(Base):
+    __tablename__ = "meal_food"
+
+    id = Column(Integer, primary_key=True)
+    meal_id = Column(Integer, ForeignKey("meals.meal_id", ondelete="CASCADE"))
+    food_id = Column(Integer, ForeignKey("foods.food_id", ondelete="CASCADE"))
+    quantity = Column(Integer, nullable=False)
+    calories = Column(Integer)
+    protein = Column(Integer)
+    carbs = Column(Integer)
+    fat = Column(Integer)
+
+    meal = relationship("Meal", back_populates="meal_foods")
+    food = relationship("Food")
+
 
 
 ## User 테이블
@@ -80,7 +88,7 @@ class Food(Base):
     allergens = Column(String(500), nullable=True)
 
     inventories = relationship("UserFoodInventory", back_populates="food")
-    meals = relationship("Meal", back_populates="food")
+
 
 
 ## UserFoodInventory 테이블
