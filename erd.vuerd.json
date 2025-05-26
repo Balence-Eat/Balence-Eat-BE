@@ -4,9 +4,9 @@
   "settings": {
     "width": 2000,
     "height": 2000,
-    "scrollTop": -971.5299,
-    "scrollLeft": -550,
-    "zoomLevel": 1,
+    "scrollTop": -1030.2052,
+    "scrollLeft": -463.6179,
+    "zoomLevel": 0.73,
     "show": 431,
     "database": 4,
     "databaseName": "balance eat!",
@@ -68,7 +68,8 @@
           "AY7sebEVOSQUrHcs_jf5v",
           "IADtiiya1qK_PhOFFxWUn",
           "bXaNi9MxUoUVZ6Cdj-O_r",
-          "hWGhHOhNAaqpFM7-MQBsZ"
+          "hWGhHOhNAaqpFM7-MQBsZ",
+          "4ZICeCQ3OX9Xe7YENa8wD"
         ],
         "seqColumnIds": [
           "jjpxqlzi4CT-2Y3q1EgCp",
@@ -79,7 +80,8 @@
           "IADtiiya1qK_PhOFFxWUn",
           "bXaNi9MxUoUVZ6Cdj-O_r",
           "hWGhHOhNAaqpFM7-MQBsZ",
-          "bm2K4RCc7oiR5fxM66t8r"
+          "bm2K4RCc7oiR5fxM66t8r",
+          "4ZICeCQ3OX9Xe7YENa8wD"
         ],
         "ui": {
           "x": 809.4135,
@@ -90,7 +92,7 @@
           "color": "#E91E63"
         },
         "meta": {
-          "updateAt": 1747296072831,
+          "updateAt": 1747824869964,
           "createAt": 1746614673175
         }
       },
@@ -1511,6 +1513,26 @@
           "updateAt": 1747368085642,
           "createAt": 1747296003038
         }
+      },
+      "4ZICeCQ3OX9Xe7YENa8wD": {
+        "id": "4ZICeCQ3OX9Xe7YENa8wD",
+        "tableId": "h8qXj4wvsJwVBFkq01YgB",
+        "name": "allergies",
+        "comment": "",
+        "dataType": "VARCHAR(100)",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 60,
+          "widthComment": 60,
+          "widthDataType": 81,
+          "widthDefault": 60
+        },
+        "meta": {
+          "updateAt": 1747824882216,
+          "createAt": 1747824869963
+        }
       }
     },
     "relationshipEntities": {
@@ -1525,7 +1547,7 @@
             "jjpxqlzi4CT-2Y3q1EgCp"
           ],
           "x": 809.4135,
-          "y": 1187.1116,
+          "y": 1193.1116,
           "direction": 1
         },
         "end": {
@@ -1581,7 +1603,7 @@
             "jjpxqlzi4CT-2Y3q1EgCp"
           ],
           "x": 1006.4135,
-          "y": 1373.1116,
+          "y": 1397.1116,
           "direction": 8
         },
         "end": {
@@ -1637,7 +1659,7 @@
             "jjpxqlzi4CT-2Y3q1EgCp"
           ],
           "x": 1203.4135,
-          "y": 1311.1116,
+          "y": 1329.1116,
           "direction": 2
         },
         "end": {
@@ -1665,7 +1687,7 @@
             "jjpxqlzi4CT-2Y3q1EgCp"
           ],
           "x": 1203.4135,
-          "y": 1187.1116,
+          "y": 1193.1116,
           "direction": 2
         },
         "end": {
@@ -1693,7 +1715,7 @@
             "jjpxqlzi4CT-2Y3q1EgCp"
           ],
           "x": 809.4135,
-          "y": 1311.1116,
+          "y": 1329.1116,
           "direction": 1
         },
         "end": {
