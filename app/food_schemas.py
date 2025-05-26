@@ -43,3 +43,9 @@ class MealFoodItem(BaseModel):
 class MealCreate(BaseModel):
     meal_type: MealType
     items: list[MealFoodItem]
+
+
+class MealUpdate(BaseModel):
+    meal_id: int
+    meal_type: MealType | None = None
+    items: list[MealFoodItem] | None = None

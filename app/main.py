@@ -292,3 +292,57 @@ def get_ai_diet(
 def search_foods(name: str, db: Session = Depends(get_db)):
     results = db.query(models.Food).filter(models.Food.name.ilike(f"%{name}%")).all()
     return [{"food_id": food.food_id, "name": food.name} for food in results]
+
+
+@app.patch("/meals/edit-meal")
+def edit_mealfood(
+    update_data: food_schemas.MealUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    # 현재 사용자의 식사인지 검증
+    meal = (
+        db.query(models.Meal)
+        .filter(
+            models.Meal.meal_id == update_data.meal_id,
+            models.Meal.user_id == current_user.user_id,
+        )
+        .first()
+    )
+
+    if not meal:
+        raise HTTPException(status_code=404, detail="해당 식사가 존재하지 않습니다.")
+
+    # 끼니 종류 수정
+    if update_data.meal_type:
+        meal.meal_type = update_data.meal_type
+
+    # 음식 구성 수정 (기존 MealFood 삭제 후 새로 삽입)
+    if update_data.items is not None:
+        # 기존 MealFood 삭제
+        db.query(models.MealFood).filter(
+            models.MealFood.meal_id == meal.meal_id
+        ).delete()
+        db.flush()
+
+        # 새 음식 추가
+        for item in update_data.items:
+            food = db.query(models.Food).filter_by(food_id=item.food_id).first()
+            if not food:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"음식 ID {item.food_id}가 존재하지 않습니다.",
+                )
+
+            new_meal_food = models.MealFood(
+                meal_id=meal.meal_id,
+                food_id=food.food_id,
+                quantity=item.quantity,
+                calories=food.calories_per_unit * item.quantity,
+                protein=food.protein_per_unit * item.quantity,
+                carbs=food.carbs_per_unit * item.quantity,
+                fat=food.fat_per_unit * item.quantity,
+            )
+            db.add(new_meal_food)
+    db.commit()
+    return {"message": "식사 정보가 수정되었습니다."}
