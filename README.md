@@ -12,6 +12,7 @@ BACKEND
 |   |   food_schemas.py # 음식 관련 pydantic 모델 관리 파일
 |   |   gemini_client.py # gemini 호출 파일
 |   |   dependencies.py # DB 의존성 주입 파일
+|   |   sel.py # 식단 관리 대시보드 파일
 ```
 ---
 ### 서버 실행 방법

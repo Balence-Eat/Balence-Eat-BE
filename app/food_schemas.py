@@ -6,6 +6,8 @@ class MealType(str, Enum):
     아침 = "아침"
     점심 = "점심"
     저녁 = "저녁"
+
+
 class FoodCreate(BaseModel):
     name: str
     unit: int
@@ -26,15 +28,24 @@ class InventoryBase(BaseModel):
 
 # ====================== 식사 기록 ======================
 
+
 class MealCreate(BaseModel):
     food_name: str
     quantity: int
-    meal_type: MealType 
-    
+    meal_type: MealType
+
+
 class MealFoodItem(BaseModel):
     food_id: int
     quantity: int
 
+
 class MealCreate(BaseModel):
     meal_type: MealType
     items: list[MealFoodItem]
+
+
+class MealUpdate(BaseModel):
+    meal_id: int
+    meal_type: MealType | None = None
+    items: list[MealFoodItem] | None = None

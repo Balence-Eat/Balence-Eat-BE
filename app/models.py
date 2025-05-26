@@ -11,10 +11,14 @@ class Meal(Base):
     meal_id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"))
     datetime = Column(DateTime, default=datetime.now(timezone.utc))
-    meal_type = Column(Enum("아침", "점심", "저녁", name="meal_type_enum"), nullable=False)
+    meal_type = Column(
+        Enum("아침", "점심", "저녁", name="meal_type_enum"), nullable=False
+    )
 
     user = relationship("User", back_populates="meals")
-    meal_foods = relationship("MealFood", back_populates="meal", cascade="all, delete-orphan")
+    meal_foods = relationship(
+        "MealFood", back_populates="meal", cascade="all, delete-orphan"
+    )
 
 
 class MealFood(Base):
@@ -31,7 +35,6 @@ class MealFood(Base):
 
     meal = relationship("Meal", back_populates="meal_foods")
     food = relationship("Food")
-
 
 
 ## User 테이블
@@ -88,7 +91,6 @@ class Food(Base):
     allergens = Column(String(500), nullable=True)
 
     inventories = relationship("UserFoodInventory", back_populates="food")
-
 
 
 ## UserFoodInventory 테이블
