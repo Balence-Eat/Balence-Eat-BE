@@ -2,15 +2,19 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, date as date_class
+from typing import List
 
 # app 내 모듈 import
 from app import models, user_schemas, food_schemas, auth
 from app.models import Meal, Food, MealFood, User
-from app.food_schemas import MealCreate
+from app.food_schemas import (
+    MealCreate, MealOut, InventoryOut, MealFoodOut,
+    FoodRegisterResponse, MessageResponse, AIDietResponse,
+    FoodSearchOut
+)
 from app.database import engine
 from app.dependencies import get_db
 from app.gemini_client import ask_gemini
-
 
 app = FastAPI()
 models.Base.metadata.create_all(engine)
@@ -53,20 +57,20 @@ async def login(db: Session = Depends(get_db), request: OAuth2PasswordRequestFor
 async def read_users_me(current_user: models.User = Depends(auth.get_current_user)):
     return current_user
 
-@app.patch("/profile/allergies")
+@app.patch("/profile/allergies", response_model=MessageResponse)
 def update_allergies(allergies: str, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     current_user.allergies = allergies
     db.commit()
     return {"message": "알레르기 정보가 업데이트되었습니다"}
 
-@app.post("/foods")
+@app.post("/foods", response_model=FoodRegisterResponse)
 def add_food(food: food_schemas.FoodCreate, db: Session = Depends(get_db)):
     new_food = models.Food(**food.dict())
     db.add(new_food)
     db.commit()
     return {"message": "음식이 등록되었습니다", "food_id": new_food.food_id}
 
-@app.post("/inventory")
+@app.post("/inventory", response_model=MessageResponse)
 def add_inventory(data: food_schemas.InventoryBase, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     item = db.query(models.UserFoodInventory).filter_by(user_id=current_user.user_id, food_id=data.food_id).first()
     if item:
@@ -77,7 +81,7 @@ def add_inventory(data: food_schemas.InventoryBase, db: Session = Depends(get_db
     db.commit()
     return {"message": "재고가 추가되었습니다"}
 
-@app.get("/inventory")
+@app.get("/inventory", response_model=List[InventoryOut])
 def get_inventory(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     inventories = db.query(models.UserFoodInventory).filter_by(user_id=current_user.user_id).all()
     result = []
@@ -86,7 +90,7 @@ def get_inventory(db: Session = Depends(get_db), current_user: models.User = Dep
         result.append({"food_id": inv.food_id, "food_name": food.name if food else "Unknown", "quantity": inv.quantity})
     return result
 
-@app.post("/meals")
+@app.post("/meals", response_model=MessageResponse)
 def add_meal(meal: MealCreate, db: Session = Depends(get_db), current_user: User = Depends(auth.get_current_user)):
     new_meal = Meal(user_id=current_user.user_id, meal_type=meal.meal_type, datetime=datetime.now(timezone.utc))
     db.add(new_meal)
@@ -111,11 +115,9 @@ def add_meal(meal: MealCreate, db: Session = Depends(get_db), current_user: User
     db.commit()
     return {"message": "한 끼 저장 완료"}
 
-
-@app.get("/meals")
+@app.get("/meals", response_model=List[MealOut])
 def get_meals(date: str = None, meal_type: str = None, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     query = db.query(models.Meal).filter(models.Meal.user_id == current_user.user_id)
-
     if date:
         try:
             date_obj = datetime.strptime(date, "%Y-%m-%d").date()
@@ -156,26 +158,37 @@ def get_meals(date: str = None, meal_type: str = None, db: Session = Depends(get
 
     return result
 
-
-@app.get("/ai-diet")
+@app.get("/ai-diet", response_model=AIDietResponse)
 def get_ai_diet(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     user = current_user
     goal = db.query(models.Goal).filter_by(user_id=user.user_id).order_by(models.Goal.date.desc()).first()
     meals = db.query(models.Meal).filter(models.Meal.user_id == user.user_id).all()
-    total_eaten = sum((db.query(models.Food).filter_by(food_id=meal.food_id).first().calories_per_unit or 0) * meal.quantity for meal in meals if db.query(models.Food).filter_by(food_id=meal.food_id).first())
+
+    # AI 응답 생성은 food_id/quantity 구조를 변경 후 적용해야 완벽함
+    total_eaten = 0
+    for meal in meals:
+        for mf in meal.meal_foods:
+            total_eaten += mf.calories or 0
+
     inventory = db.query(models.UserFoodInventory).filter_by(user_id=user.user_id).all()
-    food_items = [{"name": db.query(models.Food).filter_by(food_id=inv.food_id).first().name, "quantity": inv.quantity} for inv in inventory if db.query(models.Food).filter_by(food_id=inv.food_id).first()]
+    food_items = [
+        {"name": db.query(models.Food).filter_by(food_id=inv.food_id).first().name, "quantity": inv.quantity}
+        for inv in inventory if db.query(models.Food).filter_by(food_id=inv.food_id).first()
+    ]
+
     def filter_allergens(user, items):
         if not user.allergies:
             return items
         allergy_list = [a.strip() for a in user.allergies.split(",")]
         return [item for item in items if item["name"] not in allergy_list]
+
     safe_items = filter_allergens(user, food_items)
+
     prompt = f"""사용자의 목표 칼로리는 {goal.weight * 30}kcal이며, 오늘 섭취한 칼로리는 {total_eaten}kcal입니다.\n현재 가지고 있는 재료는 다음과 같습니다:\n{', '.join([f'{item["name"]}({item["quantity"]}개)' for item in safe_items])}\n이 재료와 정보를 바탕으로 아침, 점심, 저녁 식단을 추천해주세요."""
     ai_response = ask_gemini(prompt)
     return {"recommendation": ai_response.strip()}
 
-@app.get("/foods/search")
+@app.get("/foods/search", response_model=List[FoodSearchOut])
 def search_foods(name: str, db: Session = Depends(get_db)):
     results = db.query(models.Food).filter(models.Food.name.ilike(f"%{name}%")).all()
     return [{"food_id": food.food_id, "name": food.name} for food in results]
