@@ -11,11 +11,8 @@ class MealType(str, Enum):
     저녁 = "저녁"
 
 
-<<<<<<< HEAD
 # ====================== 음식 등록 ======================
 
-=======
->>>>>>> 74a10d5e201312c706adbb16532ab7c94e60c495
 class FoodCreate(BaseModel):
     name: str
     unit: int
@@ -40,7 +37,6 @@ class InventoryBase(BaseModel):
     quantity: int
 
 
-<<<<<<< HEAD
 class InventoryOut(BaseModel):
     food_id: int
     food_name: str
@@ -49,17 +45,6 @@ class InventoryOut(BaseModel):
 
 # ====================== 식사 기록 저장 요청 ======================
 
-=======
-# ====================== 식사 기록 ======================
-
-
-class MealCreate(BaseModel):
-    food_name: str
-    quantity: int
-    meal_type: MealType
-
-
->>>>>>> 74a10d5e201312c706adbb16532ab7c94e60c495
 class MealFoodItem(BaseModel):
     food_id: int
     quantity: int
@@ -67,7 +52,6 @@ class MealFoodItem(BaseModel):
 
 class MealCreate(BaseModel):
     meal_type: MealType
-<<<<<<< HEAD
     items: List[MealFoodItem]
 
 
@@ -115,12 +99,3 @@ class FoodRegisterResponse(BaseModel):
 
 class AIDietResponse(BaseModel):
     recommendation: str
-=======
-    items: list[MealFoodItem]
-
-
-class MealUpdate(BaseModel):
-    meal_id: int
-    meal_type: MealType | None = None
-    items: list[MealFoodItem] | None = None
->>>>>>> 74a10d5e201312c706adbb16532ab7c94e60c495
