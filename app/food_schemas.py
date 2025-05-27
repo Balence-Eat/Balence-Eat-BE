@@ -55,6 +55,14 @@ class MealCreate(BaseModel):
     items: List[MealFoodItem]
 
 
+# ====================== 식사 기록 수정 요청 ======================
+
+class MealUpdate(BaseModel):
+    meal_id: int
+    meal_type: Optional[MealType] = None
+    items: Optional[List[MealFoodItem]] = None
+
+
 # ====================== 식사 기록 응답 ======================
 
 class MealFoodOut(BaseModel):
