@@ -22,6 +22,17 @@ class FoodCreate(BaseModel):
     fat_per_unit: int
     allergens: Optional[str] = None
 
+# ===================== 음식 조회 =========================
+class FoodOut(BaseModel):
+    food_id: int
+    name: str
+    unit: int
+    calories_per_unit: int
+    protein_per_unit: int
+    carbs_per_unit: int
+    fat_per_unit: int
+    allergens: Optional[str] 
+
 
 # ====================== 음식 검색 응답 ======================
 

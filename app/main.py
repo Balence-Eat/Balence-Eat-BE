@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from datetime import datetime, timezone, date as date_class
 from typing import List
 
@@ -9,7 +10,7 @@ from app.models import Meal, Food, MealFood, User
 from app.food_schemas import (
     MealCreate, MealOut, InventoryOut, MealFoodOut,
     FoodRegisterResponse, MessageResponse, AIDietResponse,
-    FoodSearchOut, MealUpdate
+    FoodSearchOut, MealUpdate, FoodOut
 )
 from app.database import engine
 from app.dependencies import get_db
@@ -80,7 +81,12 @@ def edit_profile(update_data: user_schemas.UserUpdate, db: Session = Depends(get
     return {"message": "프로필 정보가 업데이트되었습니다"}
 
 @app.post("/foods", response_model=FoodRegisterResponse)
-def add_food(food: food_schemas.FoodCreate, db: Session = Depends(get_db)):
+def add_food(
+    food: food_schemas.FoodCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    print("current_user_id:", current_user.name)
     new_food = models.Food(**food.dict())
     db.add(new_food)
     db.commit()
@@ -99,7 +105,9 @@ def add_inventory(data: food_schemas.InventoryBase, db: Session = Depends(get_db
 
 @app.get("/inventory", response_model=List[InventoryOut])
 def get_inventory(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
+    print("current_user_id:", current_user.name)
     inventories = db.query(models.UserFoodInventory).filter_by(user_id=current_user.user_id).all()
+    print("inventories count:", len(inventories))
     result = []
     for inv in inventories:
         food = db.query(models.Food).filter_by(food_id=inv.food_id).first()
@@ -134,7 +142,7 @@ def get_meals(date: str = None, meal_type: str = None, db: Session = Depends(get
     if date:
         try:
             date_obj = datetime.strptime(date, "%Y-%m-%d").date()
-            query = query.filter(models.Meal.datetime.cast(date_class) == date_obj)
+            query = query.filter(func.date(models.Meal.datetime) == date_obj)
         except ValueError:
             raise HTTPException(status_code=400, detail="날짜 형식은 YYYY-MM-DD여야 합니다.")
     if meal_type:
@@ -194,6 +202,25 @@ def get_ai_diet(db: Session = Depends(get_db), current_user: models.User = Depen
 def search_foods(name: str, db: Session = Depends(get_db)):
     results = db.query(models.Food).filter(models.Food.name.ilike(f"%{name}%")).all()
     return [{"food_id": food.food_id, "name": food.name} for food in results]
+
+
+@app.get("/foods", response_model=List[FoodOut])
+def list_all_foods(db: Session = Depends(get_db)):
+    foods = db.query(models.Food).all()
+    return [
+        {
+            "food_id": food.food_id,
+            "name": food.name,
+            "unit": food.unit,
+            "calories_per_unit": food.calories_per_unit,
+            "protein_per_unit": food.protein_per_unit,
+            "carbs_per_unit": food.carbs_per_unit,
+            "fat_per_unit": food.fat_per_unit,
+            "allergens": food.allergens
+        }
+        for food in foods
+    ]
+
 
 @app.patch("/meals/edit-meal", response_model=MessageResponse)
 def edit_mealfood(update_data: MealUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
